@@ -101,7 +101,8 @@ class GIFPlayer(tk.Toplevel):
 def show_gif(root):
     """Plays a random GIF and schedules the next one."""
     gif_path, frames = random.choice(list(preloaded_gifs.items()))
-    gif_player = GIFPlayer(root, gif_path, frames)
+    size = preloaded_sizes[gif_path]
+    gif_player = GIFPlayer(root, gif_path, frames, size)
 
     # Schedule the next GIF
     wait_time = (len(frames) * 3 * 40) + random.randint(MIN_WAIT, MAX_WAIT)
@@ -111,8 +112,8 @@ def main():
     root = tk.Tk()
     root.withdraw()  # Hide the root window
 
-    global preloaded_gifs
-    preloaded_gifs = preload_gifs()  # Now Tkinter is initialized before calling this
+    global preloaded_gifs, preloaded_sizes
+    preloaded_gifs, preloaded_sizes = preload_gifs()  # Load GIFs and sizes
 
     show_gif(root)
     root.mainloop()
