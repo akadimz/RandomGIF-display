@@ -4,7 +4,7 @@ import random
 import os
 
 # Set the folder containing the GIFs
-GIF_FOLDER = r"C:\Users\Dimas\MyPythonScripts\AutoGif\gif"
+GIF_FOLDER = r"C:\Path\gif"
 
 # Automatically get all GIF files in the folder
 def get_gif_files():
@@ -17,19 +17,19 @@ if not gif_paths:
     print("No GIFs found in the folder!")
     exit()  # Exit if no GIFs are found
 
-# Wait time before new Gif displayed
+# Wait time before new Gif displayed, in Seconds
 MIN_WAIT = 1
 MAX_WAIT = 5
 
-# Get screen size
-screen_width = 1920  # Change to your monitor size if needed
+# Get screen size, Change to your monitor size if needed
+screen_width = 1920  
 screen_height = 1080
 
-# Gif Size
-GIF_WIDTH = 200
+# Gif Size, Change size if needed
+GIF_WIDTH = 200 
 GIF_HEIGHT = 112
 
-# Padding from edges
+# For Padding from edges, Change if needed
 PADDING = 100
 
 class GIFPlayer(tk.Toplevel):
@@ -46,11 +46,11 @@ class GIFPlayer(tk.Toplevel):
         self.frame_idx = 0
         self.rotation_count = 0
 
-        # Random position on the screen
+        # For Random position on the screen
         x = random.randint(0, max(0, screen_width - 200))
         y = random.randint(0, max(0, screen_height - 112))
 
-        # Random position at the edge of the screen
+        # For Random position at the edge of the screen
         # random_x, random_y = get_edge_position()
         # x = random_x
         # y = random_y
@@ -68,7 +68,7 @@ class GIFPlayer(tk.Toplevel):
         self.animate()
 
     def animate(self):
-        """Smoothly animates the GIF."""
+        """animates the GIF"""
         if self.frame_idx == 0 and self.rotation_count >= 3:
             self.destroy()  # Close after 2 full loops
             return
@@ -86,13 +86,13 @@ class GIFPlayer(tk.Toplevel):
         self.destroy()
 
 def show_gif(root):
-    """Plays a GIF fully (twice) before showing the next one."""
+    """Plays a GIF before showing the next one."""
 
     gif_path = random.choice(gif_paths)
     gif_player = GIFPlayer(root, gif_path)  # Show new GIF
 
-    # Wait until GIF finishes (2 full loops) before starting the next one
-    wait_time = (gif_player.total_frames * 3 * 45) + random.randint(MIN_WAIT, MAX_WAIT)  # 50ms per frame, 2 loops
+    # Wait until GIF finishes before starting the next one
+    wait_time = (gif_player.total_frames * 3 * 45) + random.randint(MIN_WAIT, MAX_WAIT)  # 45ms per frame, 3 loops + random wait time
     root.after(wait_time, show_gif, root)  # Schedule next GIF only after the current one finishes
 
 
