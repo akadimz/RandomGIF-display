@@ -101,9 +101,14 @@ def show_gif(root):
 
 def main():
     root = tk.Tk()
-    root.withdraw()
+    root.withdraw()  # Hide the root window
+
+    global preloaded_gifs
+    preloaded_gifs = preload_gifs()  # Now Tkinter is initialized before calling this
+
     show_gif(root)
     root.mainloop()
+
 
 # Run the program
 main()
