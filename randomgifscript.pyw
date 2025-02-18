@@ -41,7 +41,11 @@ class GIFPlayer(tk.Toplevel):
 
         # Load GIF and extract frames
         self.gif = Image.open(gif_path)
-        self.frames = [ImageTk.PhotoImage(frame.copy().resize((200, 112))) for frame in ImageSequence.Iterator(self.gif)]
+        try:
+            self.frames = [ImageTk.PhotoImage(frame.copy().resize((200, 112))) for frame in ImageSequence.Iterator(self.gif)]
+        except Exception as e:
+            print(f"Error loading GIF {gif_path}: {e}")
+            self.destroy()
         self.total_frames = len(self.frames)
         self.frame_idx = 0
         self.rotation_count = 0
