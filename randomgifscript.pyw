@@ -7,8 +7,8 @@ import os
 GIF_FOLDER = r"C:\Users\Dimas\MyPythonScripts\AutoGif\gif"
 
 # Wait time before new Gif displayed
-MIN_WAIT = 1000
-MAX_WAIT = 5000
+MIN_WAIT = 120 * 1000
+MAX_WAIT = 180 * 1000
 
 # Screen size (adjust if needed)
 screen_width = 1920
@@ -96,7 +96,7 @@ def show_gif(root):
     gif_player = GIFPlayer(root, gif_path, frames)
 
     # Schedule the next GIF
-    wait_time = (len(frames) * 3 * 30) + random.randint(MIN_WAIT, MAX_WAIT)
+    wait_time = (len(frames) * 3 * 40) + random.randint(MIN_WAIT, MAX_WAIT)
     root.after(wait_time, show_gif, root)
 
 def main():
