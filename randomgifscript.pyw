@@ -14,16 +14,14 @@ MAX_WAIT = 180 * 1000
 screen_width = 1920
 screen_height = 1080
 
-# Gif Size
-GIF_WIDTH = 200
-GIF_HEIGHT = 112
-
 # Padding from edges
 PADDING = 100
 
 # Preload all GIF frames
 def preload_gifs():
+    """Preloads all GIF frames into memory after Tkinter is initialized."""
     gif_data = {}
+    gif_sizes = {}  # Store each GIF's resized width and height
     gif_paths = [os.path.join(GIF_FOLDER, f) for f in os.listdir(GIF_FOLDER) if f.lower().endswith(".gif")]
 
     if not gif_paths:
@@ -33,21 +31,26 @@ def preload_gifs():
     for gif_path in gif_paths:
         try:
             gif = Image.open(gif_path)
-            frames = [ImageTk.PhotoImage(
-                    frame.copy().resize((int(frame.width * 0.75),
-                                         int(frame.height * 0.75))))
-                                         for frame in ImageSequence.Iterator(gif)]
+
+            # Calculate 75% scaled dimensions
+            new_width = int(gif.width * 0.75)
+            new_height = int(gif.height * 0.75)
+
+            frames = [ImageTk.PhotoImage(frame.copy().resize((new_width, new_height))) for frame in ImageSequence.Iterator(gif)]
+
             gif_data[gif_path] = frames
+            gif_sizes[gif_path] = (new_width, new_height)  # Store resized dimensions
+
         except Exception as e:
             print(f"Error loading GIF {gif_path}: {e}")
     
-    return gif_data
+    return gif_data, gif_sizes
 
 # Preloaded GIFs
 preloaded_gifs = preload_gifs()
 
 class GIFPlayer(tk.Toplevel):
-    def __init__(self, master, gif_path, frames):
+    def __init__(self, master, gif_path, frames, size):
         super().__init__(master)
         
         self.overrideredirect(True)  # Remove window borders
@@ -59,13 +62,15 @@ class GIFPlayer(tk.Toplevel):
         self.frame_idx = 0
         self.rotation_count = 0
 
+        self.gif_width, self.gif_height = size
+
         # Random position
-        x = random.randint(0, max(0, screen_width - GIF_WIDTH))
-        y = random.randint(0, max(0, screen_height - GIF_HEIGHT))
-        self.geometry(f"{GIF_WIDTH}x{GIF_HEIGHT}+{x}+{y}")
+        x = random.randint(0, max(0, screen_width - self.gif_width))
+        y = random.randint(0, max(0, screen_height - self.gif_height))
+        self.geometry(f"{self.gif_width}x{self.gif_height}+{x}+{y}")
 
         # Create a canvas
-        self.canvas = tk.Canvas(self, width=GIF_WIDTH, height=GIF_HEIGHT, highlightthickness=0)
+        self.canvas = tk.Canvas(self, width=self.gif_width, height=self.gif_height, highlightthickness=0)
         self.canvas.pack()
         self.img_id = self.canvas.create_image(0, 0, anchor=tk.NW, image=self.frames[0])
 
