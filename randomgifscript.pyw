@@ -33,7 +33,10 @@ def preload_gifs():
     for gif_path in gif_paths:
         try:
             gif = Image.open(gif_path)
-            frames = [ImageTk.PhotoImage(frame.copy().resize((GIF_WIDTH, GIF_HEIGHT))) for frame in ImageSequence.Iterator(gif)]
+            frames = [ImageTk.PhotoImage(
+                    frame.copy().resize((int(frame.width * 0.75),
+                                         int(frame.height * 0.75))))
+                                         for frame in ImageSequence.Iterator(gif)]
             gif_data[gif_path] = frames
         except Exception as e:
             print(f"Error loading GIF {gif_path}: {e}")
