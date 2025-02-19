@@ -12,8 +12,8 @@ PADDING = 100
 HEIGHT_MAX = 240
 WIDTH_MAX = 240
 
-WAIT_MIN = 30 * 1000
-WAIT_MAX = 60 * 1000
+WAIT_MIN = 5 * 1000
+WAIT_MAX = 6 * 1000
 
 # Create database if not exists
 def setup_database():
@@ -25,8 +25,9 @@ def setup_database():
             path TEXT UNIQUE,
             width INTEGER,
             height INTEGER,
-            frame_delay REAL,
-            total_duration INTEGER
+            frame_delay INTEGER,
+            total_duration INTEGER,
+            fps REAL
         )
     ''')
     conn.commit()
@@ -36,17 +37,17 @@ def setup_database():
 def get_stored_gifs():
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
-    cursor.execute("SELECT path, width, height, frame_delay, total_duration FROM gifs")
-    data = {row[0]: {'width': row[1], 'height': row[2], 'frame_delay': row[3], 'total_duration': row[4]} for row in cursor.fetchall()}
+    cursor.execute("SELECT path, width, height, frame_delay, total_duration, fps FROM gifs")
+    data = {row[0]: {'width': row[1], 'height': row[2], 'frame_delay': row[3], 'total_duration': row[4], 'fps': row[5]} for row in cursor.fetchall()}
     conn.close()
     return data
 
 # Store new GIF data
-def store_gif_data(path, width, height, frame_delay, total_duration):
+def store_gif_data(path, width, height, frame_delay, total_duration, fps):
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
-    cursor.execute("INSERT OR IGNORE INTO gifs (path, width, height, frame_delay, total_duration) VALUES (?, ?, ?, ?, ?)",
-                   (path, width, height, frame_delay, total_duration))
+    cursor.execute("INSERT OR IGNORE INTO gifs (path, width, height, frame_delay, total_duration, fps) VALUES (?, ?, ?, ?, ?, ?)",
+                   (path, width, height, frame_delay, total_duration, fps))
     conn.commit()
     conn.close()
 
@@ -62,18 +63,40 @@ def process_new_gifs():
             new_gif_data[path] = stored_gifs[path]  # Load stored data
         else:
             gif = Image.open(path)
-            
-            frame_delay = gif.info.get("duration", 30)  # Keep in ms
-            total_duration = len(list(ImageSequence.Iterator(gif))) * frame_delay
+            frame_delays = gif.info.get("duration", 15)
+            if isinstance(frame_delays, list):
+                frame_delay = sum(frame_delays) / len(frame_delays)  # Average frame delay
+            else:
+                frame_delay = frame_delays
 
+            total_frames = len(list(ImageSequence.Iterator(gif)))
+            total_duration = total_frames * frame_delay  # Total duration in ms
+            fps = round(1000 / frame_delay, 2) if frame_delay > 0 else 30
+
+            
             scale_factor = min(max_width / gif.width, max_height / gif.height, 1)  # Ensure it scales down but not up
             new_width = int(gif.width * scale_factor)
             new_height = int(gif.height * scale_factor)
             
-            store_gif_data(path, new_width, new_height, frame_delay, total_duration)
-            new_gif_data[path] = {'width': new_width, 'height': new_height, 'frame_delay': frame_delay, 'total_duration': total_duration}
+            store_gif_data(path, new_width, new_height, frame_delay, total_duration, fps)
+            new_gif_data[path] = {'width': new_width, 'height': new_height, 'frame_delay': frame_delay, 'total_duration': total_duration, 'fps': fps}
     
     return new_gif_data
+
+recent_gifs = []
+HISTORY_LIMIT = 5
+
+def get_next_gif(gif_data):
+    global recent_gifs
+    available_gifs = list(set(gif_data.keys()) - set(recent_gifs))
+    if not available_gifs:
+        recent_gifs.clear()
+        available_gifs = list(gif_data.keys())
+    gif_path = random.choice(available_gifs)
+    recent_gifs.append(gif_path)
+    if len(recent_gifs) > HISTORY_LIMIT:
+        recent_gifs.pop(0)
+    return gif_path
 
 # Tkinter GIF Player
 class GIFPlayer(tk.Toplevel):
@@ -98,7 +121,8 @@ class GIFPlayer(tk.Toplevel):
         self.img_id = self.canvas.create_image(0, 0, anchor=tk.NW, image=self.frames[0])
         self.canvas.bind("<Button-1>", self.close_gif)
         
-        self.frame_delay = int(gif_data['frame_delay'])
+        self.fps = gif_data['fps']
+        self.frame_delay = int(gif_data['frame_delay'])  # Use exact frame delay
         self.total_duration = gif_data['total_duration']
         self.animate()
 
@@ -120,7 +144,7 @@ class GIFPlayer(tk.Toplevel):
 
 # Show GIF
 def show_gif(root, gif_data):
-    gif_path = random.choice(list(gif_data.keys()))
+    gif_path = get_next_gif(gif_data)
     player = GIFPlayer(root, gif_path, gif_data[gif_path])
     root.after(int(gif_data[gif_path]['total_duration']) + random.randint(WAIT_MIN, WAIT_MAX), show_gif, root, gif_data)
 
