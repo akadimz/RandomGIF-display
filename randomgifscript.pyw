@@ -18,7 +18,8 @@ screen_height = 1080
 PADDING = 100
 
 # Gif max size
-GIF_MAX = 100
+GIF_HEIGHT = 150
+GIF_WIDTH = 200
 
 
 root = tk.Tk()
@@ -45,10 +46,16 @@ def preload_gifs():
             new_height = int(gif.height * 0.25)
 
             # Ensure the height does not exceed max size
-            if new_height > GIF_MAX:
-                scale_factor = GIF_MAX / new_height
-                new_height = GIF_MAX
-                new_width = int(new_width * scale_factor)  # Maintain aspect ratio            
+            if new_height > GIF_HEIGHT:
+                scale_factor = GIF_HEIGHT / new_height
+                new_height = GIF_HEIGHT
+                new_width = int(new_width * scale_factor)  # Maintain aspect ratio
+
+            # Ensure width does not become too small
+            if new_width < GIF_WIDTH:
+                scale_factor = GIF_WIDTH / (gif.width * 0.25)  # Use original width scaled down
+                new_width = GIF_WIDTH
+                new_height = int(gif.height * 0.25 * scale_factor)  # Maintain aspect ratio
 
             frames = [ImageTk.PhotoImage(frame.copy().resize((new_width, new_height))) for frame in ImageSequence.Iterator(gif)]
             frame_delay = gif.info.get("duration", 30)
