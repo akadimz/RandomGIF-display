@@ -12,8 +12,8 @@ PADDING = 100
 HEIGHT_MAX = 240
 WIDTH_MAX = 240
 
-WAIT_MIN = 5 * 1000
-WAIT_MAX = 6 * 1000
+WAIT_MIN = 30 * 1000
+WAIT_MAX = 60 * 1000
 
 # Create database if not exists
 def setup_database():
@@ -46,7 +46,7 @@ def get_stored_gifs():
 def store_gif_data(path, width, height, frame_delay, total_duration, fps):
     conn = sqlite3.connect(DB_FILE)
     cursor = conn.cursor()
-    cursor.execute("INSERT OR IGNORE INTO gifs (path, width, height, frame_delay, total_duration, fps) VALUES (?, ?, ?, ?, ?, ?)",
+    cursor.execute("INSERT OR REPLACE INTO gifs (path, width, height, frame_delay, total_duration, fps) VALUES (?, ?, ?, ?, ?, ?)",
                    (path, width, height, frame_delay, total_duration, fps))
     conn.commit()
     conn.close()
@@ -63,16 +63,12 @@ def process_new_gifs():
             new_gif_data[path] = stored_gifs[path]  # Load stored data
         else:
             gif = Image.open(path)
-            frame_delays = gif.info.get("duration", 15)
-            if isinstance(frame_delays, list):
-                frame_delay = sum(frame_delays) / len(frame_delays)  # Average frame delay
-            else:
-                frame_delay = frame_delays
-
-            total_frames = len(list(ImageSequence.Iterator(gif)))
-            total_duration = total_frames * frame_delay  # Total duration in ms
-            fps = round(1000 / frame_delay, 2) if frame_delay > 0 else 30
-
+            frame_delays = [frame.info.get("duration", 30) for frame in ImageSequence.Iterator(gif)]
+            frame_delay = sum(frame_delays) / len(frame_delays) if frame_delays else 30
+            
+            total_frames = len(frame_delays)
+            total_duration = sum(frame_delays)  # Total duration in ms
+            fps = 1000 / frame_delay if frame_delay > 0 else 30  # Compute FPS
             
             scale_factor = min(max_width / gif.width, max_height / gif.height, 1)  # Ensure it scales down but not up
             new_width = int(gif.width * scale_factor)
@@ -84,7 +80,7 @@ def process_new_gifs():
     return new_gif_data
 
 recent_gifs = []
-HISTORY_LIMIT = 5
+HISTORY_LIMIT = 8
 
 def get_next_gif(gif_data):
     global recent_gifs
@@ -107,6 +103,7 @@ class GIFPlayer(tk.Toplevel):
         
         self.gif = Image.open(gif_path)
         self.frames = [ImageTk.PhotoImage(frame.copy().resize((gif_data['width'], gif_data['height']))) for frame in ImageSequence.Iterator(self.gif)]
+        self.frame_delays = [frame.info.get("duration", 30) for frame in ImageSequence.Iterator(self.gif)]
         self.total_frames = len(self.frames)
         self.frame_idx = 0
         self.rotation_count = 0
@@ -121,9 +118,6 @@ class GIFPlayer(tk.Toplevel):
         self.img_id = self.canvas.create_image(0, 0, anchor=tk.NW, image=self.frames[0])
         self.canvas.bind("<Button-1>", self.close_gif)
         
-        self.fps = gif_data['fps']
-        self.frame_delay = int(gif_data['frame_delay'])  # Use exact frame delay
-        self.total_duration = gif_data['total_duration']
         self.animate()
 
     def animate(self):
@@ -132,12 +126,13 @@ class GIFPlayer(tk.Toplevel):
             return
 
         self.canvas.itemconfig(self.img_id, image=self.frames[self.frame_idx])
+        delay = self.frame_delays[self.frame_idx] if self.frame_idx < len(self.frame_delays) else 30
         self.frame_idx = (self.frame_idx + 1) % self.total_frames
         
         if self.frame_idx == 0:
             self.rotation_count += 1
         
-        self.after(self.frame_delay, self.animate)
+        self.after(delay, self.animate)
 
     def close_gif(self, event=None):
         self.destroy()
