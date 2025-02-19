@@ -7,8 +7,8 @@ import os
 GIF_FOLDER = r"C:\Users\Dimas\MyPythonScripts\AutoGif\gif"
 
 # Wait time before new Gif displayed
-MIN_WAIT = 120 * 1000
-MAX_WAIT = 180 * 1000
+MIN_WAIT = 30 * 1000
+MAX_WAIT = 120 * 1000
 
 # Screen size (adjust if needed)
 screen_width = 1920
@@ -16,6 +16,10 @@ screen_height = 1080
 
 # Padding from edges
 PADDING = 100
+
+# Gif max size
+GIF_MAX = 100
+
 
 root = tk.Tk()
 root.withdraw()  # Hide the root window
@@ -36,9 +40,15 @@ def preload_gifs():
         try:
             gif = Image.open(gif_path)
 
-            # Calculate 75% scaled dimensions
+            # Calculate 25% scaled dimensions
             new_width = int(gif.width * 0.25)
             new_height = int(gif.height * 0.25)
+
+            # Ensure the height does not exceed max size
+            if new_height > GIF_MAX:
+                scale_factor = GIF_MAX / new_height
+                new_height = GIF_MAX
+                new_width = int(new_width * scale_factor)  # Maintain aspect ratio            
 
             frames = [ImageTk.PhotoImage(frame.copy().resize((new_width, new_height))) for frame in ImageSequence.Iterator(gif)]
             frame_delay = gif.info.get("duration", 30)
