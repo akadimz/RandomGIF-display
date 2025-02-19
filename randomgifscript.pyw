@@ -18,7 +18,7 @@ screen_height = 1080
 PADDING = 100
 
 # Gif max size
-GIF_HEIGHT = 150
+GIF_HEIGHT = 240
 GIF_WIDTH = 200
 
 
@@ -41,21 +41,37 @@ def preload_gifs():
         try:
             gif = Image.open(gif_path)
 
-            # Calculate 25% scaled dimensions
-            new_width = int(gif.width * 0.25)
-            new_height = int(gif.height * 0.25)
+            #Resize gift if more than max size
+            if gif.width > GIF_WIDTH or gif.height > GIF_HEIGHT:
+                new_width = int(gif.width)
+                new_height = int(gif.height)
 
-            # Ensure the height does not exceed max size
-            if new_height > GIF_HEIGHT:
-                scale_factor = GIF_HEIGHT / new_height
-                new_height = GIF_HEIGHT
-                new_width = int(new_width * scale_factor)  # Maintain aspect ratio
+                # Ensure the height does not exceed max size
+                if new_height > GIF_HEIGHT:
+                    scale_factor = GIF_HEIGHT / new_height
+                    new_height = GIF_HEIGHT
+                    new_width = int(new_width * scale_factor)  # Maintain aspect ratio
 
-            # Ensure width does not become too small
-            if new_width < GIF_WIDTH:
-                scale_factor = GIF_WIDTH / (gif.width * 0.25)  # Use original width scaled down
-                new_width = GIF_WIDTH
-                new_height = int(gif.height * 0.25 * scale_factor)  # Maintain aspect ratio
+                # Ensure width does not become too big
+                if new_width > GIF_WIDTH:
+                    scale_factor = GIF_WIDTH / gif.width  # Use original width scaled down
+                    new_width = GIF_WIDTH
+                    new_height = int(gif.height * scale_factor)  # Maintain aspect ratio
+            
+                    # If the size still over the max size scale it to 25%
+                    if new_height > GIF_HEIGHT:
+                        new_height = int(gif.height * 0.25)
+                        new_width = int(gif.width * 0.25)
+
+                        if new_height > GIF_HEIGHT:
+                            scale_factor = GIF_HEIGHT / new_height
+                            new_height = GIF_HEIGHT
+                            new_width = int(new_width * scale_factor)
+
+                        if new_width > GIF_WIDTH:
+                            scale_factor = GIF_WIDTH / gif.width
+                            new_width = GIF_WIDTH
+                            new_height = int(gif.height * scale_factor)
 
             frames = [ImageTk.PhotoImage(frame.copy().resize((new_width, new_height))) for frame in ImageSequence.Iterator(gif)]
             frame_delay = gif.info.get("duration", 30)
@@ -89,8 +105,8 @@ class GIFPlayer(tk.Toplevel):
         self.gif_width, self.gif_height = size
 
         # Random position
-        x = random.randint(0, max(0, screen_width - self.gif_width))
-        y = random.randint(0, max(0, screen_height - self.gif_height))
+        x = random.randint(0, max(0, screen_width - self.gif_width - PADDING))
+        y = random.randint(0, max(0, screen_height - self.gif_height - PADDING))
         self.geometry(f"{self.gif_width}x{self.gif_height}+{x}+{y}")
 
         # Create a canvas
