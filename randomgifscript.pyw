@@ -7,8 +7,8 @@ import os
 GIF_FOLDER = r"C:\Users\Dimas\MyPythonScripts\AutoGif\gif"
 
 # Wait time before new Gif displayed
-MIN_WAIT = 1 * 1000
-MAX_WAIT = 5 * 1000
+MIN_WAIT = 120 * 1000
+MAX_WAIT = 180 * 1000
 
 # Screen size (adjust if needed)
 screen_width = 1920
@@ -117,8 +117,6 @@ def show_gif(root):
     root.after(wait_time, show_gif, root)
 
 def main():
-    
-
     global preloaded_gifs, preloaded_sizes, preloaded_delays
     preloaded_gifs, preloaded_sizes, preloaded_delays = preload_gifs()  # Load GIFs, delays and sizes
 
