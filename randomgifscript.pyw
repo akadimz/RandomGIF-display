@@ -62,7 +62,7 @@ def process_new_gifs():
             new_gif_data[path] = stored_gifs[path]  # Load stored data
         else:
             gif = Image.open(path)
-            frame_delay = gif.info.get("duration", 30) / 1000  # Convert ms to seconds
+            frame_delay = gif.info.get("duration", 30)  # Convert ms to seconds
             total_duration = len(list(ImageSequence.Iterator(gif))) * frame_delay * 1000  # Total duration in ms
             
             scale_factor = min(max_width / gif.width, max_height / gif.height, 1)  # Ensure it scales down but not up
