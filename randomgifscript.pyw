@@ -62,9 +62,10 @@ def process_new_gifs():
             new_gif_data[path] = stored_gifs[path]  # Load stored data
         else:
             gif = Image.open(path)
-            frame_delay = gif.info.get("duration", 30)  # Convert ms to seconds
-            total_duration = len(list(ImageSequence.Iterator(gif))) * frame_delay * 1000  # Total duration in ms
             
+            frame_delay = gif.info.get("duration", 30)  # Keep in ms
+            total_duration = len(list(ImageSequence.Iterator(gif))) * frame_delay
+
             scale_factor = min(max_width / gif.width, max_height / gif.height, 1)  # Ensure it scales down but not up
             new_width = int(gif.width * scale_factor)
             new_height = int(gif.height * scale_factor)
@@ -97,7 +98,7 @@ class GIFPlayer(tk.Toplevel):
         self.img_id = self.canvas.create_image(0, 0, anchor=tk.NW, image=self.frames[0])
         self.canvas.bind("<Button-1>", self.close_gif)
         
-        self.frame_delay = int(gif_data['frame_delay'] * 1000)
+        self.frame_delay = int(gif_data['frame_delay'])
         self.total_duration = gif_data['total_duration']
         self.animate()
 
