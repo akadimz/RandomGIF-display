@@ -41,37 +41,20 @@ def preload_gifs():
         try:
             gif = Image.open(gif_path)
 
-            #Resize gift if more than max size
-            if gif.width > GIF_WIDTH or gif.height > GIF_HEIGHT:
-                new_width = int(gif.width)
-                new_height = int(gif.height)
+            # Get original dimensions
+            original_width = gif.width
+            original_height = gif.height
 
-                # Ensure the height does not exceed max size
-                if new_height > GIF_HEIGHT:
-                    scale_factor = GIF_HEIGHT / new_height
-                    new_height = GIF_HEIGHT
-                    new_width = int(new_width * scale_factor)  # Maintain aspect ratio
+            # Calculate the scale factor for both width and height
+            scale_width = GIF_WIDTH / original_width
+            scale_height = GIF_HEIGHT / original_height
 
-                # Ensure width does not become too big
-                if new_width > GIF_WIDTH:
-                    scale_factor = GIF_WIDTH / gif.width  # Use original width scaled down
-                    new_width = GIF_WIDTH
-                    new_height = int(gif.height * scale_factor)  # Maintain aspect ratio
-            
-                    # If the size still over the max size scale it to 25%
-                    if new_height > GIF_HEIGHT:
-                        new_height = int(gif.height * 0.25)
-                        new_width = int(gif.width * 0.25)
+            # Use the smallest scale factor to ensure it fits within the 200x240 window
+            scale_factor = min(scale_width, scale_height)
 
-                        if new_height > GIF_HEIGHT:
-                            scale_factor = GIF_HEIGHT / new_height
-                            new_height = GIF_HEIGHT
-                            new_width = int(new_width * scale_factor)
-
-                        if new_width > GIF_WIDTH:
-                            scale_factor = GIF_WIDTH / gif.width
-                            new_width = GIF_WIDTH
-                            new_height = int(gif.height * scale_factor)
+            # Apply scaling
+            new_width = int(original_width * scale_factor)
+            new_height = int(original_height * scale_factor)
 
             frames = [ImageTk.PhotoImage(frame.copy().resize((new_width, new_height))) for frame in ImageSequence.Iterator(gif)]
             frame_delay = gif.info.get("duration", 30)
