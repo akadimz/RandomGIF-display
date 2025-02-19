@@ -2,143 +2,136 @@ import tkinter as tk
 from PIL import Image, ImageTk, ImageSequence
 import random
 import os
+import sqlite3
 
 # Set the folder containing the GIFs
 GIF_FOLDER = r"C:\Users\Dimas\MyPythonScripts\AutoGif\gif"
+DB_FILE = "gif_data.db"
 
-# Wait time before new Gif displayed
-MIN_WAIT = 30 * 1000
-MAX_WAIT = 120 * 1000
-
-# Screen size (adjust if needed)
-screen_width = 1920
-screen_height = 1080
-
-# Padding from edges
 PADDING = 100
+HEIGHT_MAX = 240
+WIDTH_MAX = 240
 
-# Gif max size
-GIF_HEIGHT = 240
-GIF_WIDTH = 200
+WAIT_MIN = 30 * 1000
+WAIT_MAX = 60 * 1000
 
+# Create database if not exists
+def setup_database():
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS gifs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            path TEXT UNIQUE,
+            width INTEGER,
+            height INTEGER,
+            frame_delay REAL,
+            total_duration INTEGER
+        )
+    ''')
+    conn.commit()
+    conn.close()
 
-root = tk.Tk()
-root.withdraw()  # Hide the root window
+# Get stored GIF data
+def get_stored_gifs():
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    cursor.execute("SELECT path, width, height, frame_delay, total_duration FROM gifs")
+    data = {row[0]: {'width': row[1], 'height': row[2], 'frame_delay': row[3], 'total_duration': row[4]} for row in cursor.fetchall()}
+    conn.close()
+    return data
 
-# Preload all GIF frames
-def preload_gifs():
-    """Preloads all GIF frames into memory after Tkinter is initialized."""
-    gif_data = {}
-    gif_sizes = {}  # Store each GIF's resized width and height
-    gif_delays = {} # Store each GIF's frame delay
+# Store new GIF data
+def store_gif_data(path, width, height, frame_delay, total_duration):
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    cursor.execute("INSERT OR IGNORE INTO gifs (path, width, height, frame_delay, total_duration) VALUES (?, ?, ?, ?, ?)",
+                   (path, width, height, frame_delay, total_duration))
+    conn.commit()
+    conn.close()
+
+# Process and store new GIFs
+def process_new_gifs():
+    stored_gifs = get_stored_gifs()
     gif_paths = [os.path.join(GIF_FOLDER, f) for f in os.listdir(GIF_FOLDER) if f.lower().endswith(".gif")]
-
-    if not gif_paths:
-        print("No GIFs found in the folder!")
-        exit()
-
-    for gif_path in gif_paths:
-        try:
-            gif = Image.open(gif_path)
-
-            # Get original dimensions
-            original_width = gif.width
-            original_height = gif.height
-
-            # Calculate the scale factor for both width and height
-            scale_width = GIF_WIDTH / original_width
-            scale_height = GIF_HEIGHT / original_height
-
-            # Use the smallest scale factor to ensure it fits within the 200x240 window
-            scale_factor = min(scale_width, scale_height)
-
-            # Apply scaling
-            new_width = int(original_width * scale_factor)
-            new_height = int(original_height * scale_factor)
-
-            frames = [ImageTk.PhotoImage(frame.copy().resize((new_width, new_height))) for frame in ImageSequence.Iterator(gif)]
-            frame_delay = gif.info.get("duration", 30)
-
-            gif_data[gif_path] = frames
-            gif_sizes[gif_path] = (new_width, new_height)  # Store resized dimensions
-            gif_delays[gif_path] = frame_delay
-
-        except Exception as e:
-            print(f"Error loading GIF {gif_path}: {e}")
     
-    return gif_data, gif_sizes, gif_delays
+    new_gif_data = {}
+    max_width, max_height = WIDTH_MAX, HEIGHT_MAX
+    for path in gif_paths:
+        if path in stored_gifs:
+            new_gif_data[path] = stored_gifs[path]  # Load stored data
+        else:
+            gif = Image.open(path)
+            frame_delay = gif.info.get("duration", 30) / 1000  # Convert ms to seconds
+            total_duration = len(list(ImageSequence.Iterator(gif))) * frame_delay * 1000  # Total duration in ms
+            
+            scale_factor = min(max_width / gif.width, max_height / gif.height, 1)  # Ensure it scales down but not up
+            new_width = int(gif.width * scale_factor)
+            new_height = int(gif.height * scale_factor)
+            
+            store_gif_data(path, new_width, new_height, frame_delay, total_duration)
+            new_gif_data[path] = {'width': new_width, 'height': new_height, 'frame_delay': frame_delay, 'total_duration': total_duration}
+    
+    return new_gif_data
 
-# Preloaded GIFs
-preloaded_gifs = preload_gifs()
-
+# Tkinter GIF Player
 class GIFPlayer(tk.Toplevel):
-    def __init__(self, master, gif_path, frames, size, frame_delay):
+    def __init__(self, master, gif_path, gif_data):
         super().__init__(master)
+        self.overrideredirect(True)
+        self.attributes("-topmost", True)
         
-        self.overrideredirect(True)  # Remove window borders
-        self.attributes("-topmost", True)  # Keep GIF on top
-
-        # Use preloaded frames
-        self.frames = frames
+        self.gif = Image.open(gif_path)
+        self.frames = [ImageTk.PhotoImage(frame.copy().resize((gif_data['width'], gif_data['height']))) for frame in ImageSequence.Iterator(self.gif)]
         self.total_frames = len(self.frames)
         self.frame_idx = 0
         self.rotation_count = 0
-        self.frame_delay = frame_delay
-
-        self.gif_width, self.gif_height = size
-
-        # Random position
-        x = random.randint(0, max(0, screen_width - self.gif_width - PADDING))
-        y = random.randint(0, max(0, screen_height - self.gif_height - PADDING))
-        self.geometry(f"{self.gif_width}x{self.gif_height}+{x}+{y}")
-
-        # Create a canvas
-        self.canvas = tk.Canvas(self, width=self.gif_width, height=self.gif_height, highlightthickness=0)
+        
+        screen_width, screen_height = 1920, 1080  # Change if needed
+        x = random.randint(0, max(0, screen_width - gif_data['width'] - PADDING))
+        y = random.randint(0, max(0, screen_height - gif_data['height'] - PADDING))
+        self.geometry(f"{gif_data['width']}x{gif_data['height']}+{x}+{y}")
+        
+        self.canvas = tk.Canvas(self, width=gif_data['width'], height=gif_data['height'], highlightthickness=0)
         self.canvas.pack()
         self.img_id = self.canvas.create_image(0, 0, anchor=tk.NW, image=self.frames[0])
-
-        # Bind click event to close GIF
         self.canvas.bind("<Button-1>", self.close_gif)
-
-        # Start animation
+        
+        self.frame_delay = int(gif_data['frame_delay'] * 1000)
+        self.total_duration = gif_data['total_duration']
         self.animate()
 
     def animate(self):
-        """Animate the GIF."""
         if self.frame_idx == 0 and self.rotation_count >= 3:
             self.destroy()
             return
 
         self.canvas.itemconfig(self.img_id, image=self.frames[self.frame_idx])
         self.frame_idx = (self.frame_idx + 1) % self.total_frames
-
+        
         if self.frame_idx == 0:
             self.rotation_count += 1
-
+        
         self.after(self.frame_delay, self.animate)
 
     def close_gif(self, event=None):
-        """Destroy the GIF window when clicked."""
         self.destroy()
 
-def show_gif(root):
-    """Plays a random GIF and schedules the next one."""
-    gif_path, frames = random.choice(list(preloaded_gifs.items()))
-    size = preloaded_sizes[gif_path]
-    frame_delay = preloaded_delays[gif_path]
-    gif_player = GIFPlayer(root, gif_path, frames, size, frame_delay)
+# Show GIF
+def show_gif(root, gif_data):
+    gif_path = random.choice(list(gif_data.keys()))
+    player = GIFPlayer(root, gif_path, gif_data[gif_path])
+    root.after(int(gif_data[gif_path]['total_duration']) + random.randint(WAIT_MIN, WAIT_MAX), show_gif, root, gif_data)
 
-    # Schedule the next GIF
-    wait_time = (len(frames) * 3 * frame_delay) + random.randint(MIN_WAIT, MAX_WAIT)
-    root.after(wait_time, show_gif, root)
-
+# Main function
 def main():
-    global preloaded_gifs, preloaded_sizes, preloaded_delays
-    preloaded_gifs, preloaded_sizes, preloaded_delays = preload_gifs()  # Load GIFs, delays and sizes
-
-    show_gif(root)
+    global root
+    root = tk.Tk()
+    root.withdraw()
+    setup_database()
+    gif_data = process_new_gifs()
+    root.after(100, show_gif, root, gif_data)
     root.mainloop()
-
 
 # Run the program
 main()
