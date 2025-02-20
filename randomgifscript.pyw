@@ -15,6 +15,8 @@ WIDTH_MAX = 240
 WAIT_MIN = 30 * 1000
 WAIT_MAX = 60 * 1000
 
+IS_ACTIVE = False
+
 # Create database if not exists
 def setup_database():
     conn = sqlite3.connect(DB_FILE)
@@ -54,8 +56,15 @@ def store_gif_data(path, width, height, frame_delay, total_duration, fps):
 # Process and store new GIFs
 def process_new_gifs():
     stored_gifs = get_stored_gifs()
-    gif_paths = [os.path.join(GIF_FOLDER, f) for f in os.listdir(GIF_FOLDER) if f.lower().endswith(".gif")]
+    gif_paths = {os.path.join(GIF_FOLDER, f) for f in os.listdir(GIF_FOLDER) if f.lower().endswith(".gif")}
     
+    # Remove GIFs from DB that no longer exist in the folder
+    stored_paths = set(stored_gifs.keys())
+    missing_gifs = stored_paths - gif_paths  # GIFs in DB but not in folder
+    
+    if missing_gifs:
+        delete_gifs_from_db(missing_gifs)
+
     new_gif_data = {}
     max_width, max_height = WIDTH_MAX, HEIGHT_MAX
     for path in gif_paths:
@@ -79,6 +88,14 @@ def process_new_gifs():
     
     return new_gif_data
 
+def delete_gifs_from_db(missing_gifs):
+    """Delete GIFs from the database that no longer exist in the folder."""
+    conn = sqlite3.connect(DB_FILE)
+    cursor = conn.cursor()
+    cursor.executemany("DELETE FROM gifs WHERE path = ?", [(path,) for path in missing_gifs])
+    conn.commit()
+    conn.close()
+
 recent_gifs = []
 HISTORY_LIMIT = 8
 
@@ -100,6 +117,8 @@ class GIFPlayer(tk.Toplevel):
         super().__init__(master)
         self.overrideredirect(True)
         self.attributes("-topmost", True)
+        global IS_ACTIVE
+        IS_ACTIVE = True
         
         self.gif = Image.open(gif_path)
         self.frames = [ImageTk.PhotoImage(frame.copy().resize((gif_data['width'], gif_data['height']))) for frame in ImageSequence.Iterator(self.gif)]
@@ -108,10 +127,20 @@ class GIFPlayer(tk.Toplevel):
         self.frame_idx = 0
         self.rotation_count = 0
         
-        screen_width, screen_height = 1920, 1080  # Change if needed
-        x = random.randint(0, max(0, screen_width - gif_data['width'] - PADDING))
-        y = random.randint(0, max(0, screen_height - gif_data['height'] - PADDING))
+        screen_width, screen_height = 1920, 1080
+        restricted_width = screen_width * 3 // 4  # 3/4 of the width (bottom-right area)
+        restricted_height = screen_height // 2  # 1/2 of the height
+
+        # For Random position within the bottom-right area
+        x = random.randint(restricted_width, max(0, screen_width - gif_data['width'] - PADDING))
+        y = random.randint(restricted_height, max(0, screen_height - gif_data['height'] - PADDING))
+
         self.geometry(f"{gif_data['width']}x{gif_data['height']}+{x}+{y}")
+
+        # For Random Position whole screen
+        # x = random.randint(0, max(0, screen_width - gif_data['width'] - PADDING))
+        # y = random.randint(0, max(0, screen_height - gif_data['height'] - PADDING))
+        # self.geometry(f"{gif_data['width']}x{gif_data['height']}+{x}+{y}")
         
         self.canvas = tk.Canvas(self, width=gif_data['width'], height=gif_data['height'], highlightthickness=0)
         self.canvas.pack()
@@ -122,7 +151,7 @@ class GIFPlayer(tk.Toplevel):
 
     def animate(self):
         if self.frame_idx == 0 and self.rotation_count >= 3:
-            self.destroy()
+            self.close_gif()
             return
 
         self.canvas.itemconfig(self.img_id, image=self.frames[self.frame_idx])
@@ -135,13 +164,21 @@ class GIFPlayer(tk.Toplevel):
         self.after(delay, self.animate)
 
     def close_gif(self, event=None):
+        """Destroy the GIF window and set flag to False."""
+        global IS_ACTIVE
+        IS_ACTIVE = False  # Mark GIF as finished
         self.destroy()
 
 # Show GIF
 def show_gif(root, gif_data):
-    gif_path = get_next_gif(gif_data)
-    player = GIFPlayer(root, gif_path, gif_data[gif_path])
-    root.after(int(gif_data[gif_path]['total_duration']) + random.randint(WAIT_MIN, WAIT_MAX), show_gif, root, gif_data)
+    global IS_ACTIVE
+    if not IS_ACTIVE:
+        gif_path = get_next_gif(gif_data)
+        player = GIFPlayer(root, gif_path, gif_data[gif_path])
+        root.after(random.randint(WAIT_MIN, WAIT_MAX), show_gif, root, gif_data)
+    else:
+        root.after(1000, show_gif, root, gif_data)
+    
 
 # Main function
 def main():
