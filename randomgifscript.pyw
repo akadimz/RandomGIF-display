@@ -6,7 +6,7 @@ import sqlite3
 import json
 
 # Set the folder containing the GIFs
-GIF_FOLDER = r"C:\Users\Dimas\MyPythonScripts\AutoGif\gif"
+GIF_FOLDER = r"C:\Path\gif"
 DB_FILE = "gif_data.db"
 
 PADDING = 100
